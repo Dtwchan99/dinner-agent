@@ -1,0 +1,6 @@
+{
+  "name": "chan-family-dinner-agent",
+  "version": "1.0.0",
+  "description": "Chan Family Dinner Suggestion Agent",
+  "engines": { "node": "18.x" }
+}
