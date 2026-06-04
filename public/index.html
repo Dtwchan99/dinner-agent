@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chan Family Dinner Agent</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f7; color: #1d1d1f; min-height: 100vh; padding: 24px 16px; }
+    .container { max-width: 540px; margin: 0 auto; }
+    .header { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+    .header-icon { font-size: 32px; }
+    .header h1 { font-size: 22px; font-weight: 600; }
+    .header p { font-size: 13px; color: #6e6e73; margin-top: 2px; }
+    .card { background: white; border-radius: 16px; padding: 16px 20px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    label { font-size: 12px; color: #6e6e73; display: block; margin-bottom: 6px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; }
+    input[type="date"], input[type="text"] { width: 100%; border: 1px solid #d1d1d6; border-radius: 10px; padding: 10px 12px; font-size: 15px; outline: none; transition: border 0.2s; background: #f9f9fb; }
+    input:focus { border-color: #0071e3; background: white; }
+    .row { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+    .btn { background: #0071e3; color: white; border: none; border-radius: 10px; padding: 10px 16px; font-size: 14px; font-weight: 500; cursor: pointer; transition: background 0.2s; white-space: nowrap; }
+    .btn:hover { background: #0077ed; }
+    .btn:active { background: #005bb5; }
+    .btn:disabled { background: #b0b0b8; cursor: not-allowed; }
+    .btn-secondary { background: #f2f2f7; color: #1d1d1f; }
+    .btn-secondary:hover { background: #e5e5ea; }
+    .btn-full { width: 100%; padding: 14px; font-size: 16px; border-radius: 12px; margin-top: 4px; }
+    .status { background: #f2f2f7; border-radius: 10px; padding: 10px 14px; font-size: 13px; color: #6e6e73; margin-top: 12px; display: none; align-items: center; gap: 8px; }
+    .spinner { width: 14px; height: 14px; border: 2px solid #d1d1d6; border-top-color: #0071e3; border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .section-label { font-size: 11px; font-weight: 600; color: #6e6e73; text-transform: uppercase; letter-spacing: 0.06em; margin: 20px 0 8px; }
+    .result-card { background: white; border-radius: 14px; padding: 14px 16px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); display: flex; gap: 12px; align-items: flex-start; }
+    .result-icon { font-size: 22px; margin-top: 1px; flex-shrink: 0; }
+    .result-title { font-size: 15px; font-weight: 600; margin-bottom: 2px; }
+    .result-sub { font-size: 13px; color: #6e6e73; margin-bottom: 4px; }
+    .badges { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+    .badge { font-size: 12px; padding: 3px 9px; border-radius: 20px; font-weight: 500; }
+    .badge-green { background: #d1f5d3; color: #1a7a1e; }
+    .badge-gray { background: #f2f2f7; color: #6e6e73; }
+    .badge-blue { background: #ddf0ff; color: #005a9e; }
+    .tg-banner { background: #ddf0ff; border-radius: 12px; padding: 12px 16px; font-size: 13px; color: #005a9e; display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+    .empty { text-align: center; padding: 40px 20px; color: #6e6e73; }
+    .empty-icon { font-size: 40px; margin-bottom: 12px; }
+    .error-box { background: #fff2f2; border-radius: 12px; padding: 12px 16px; font-size: 13px; color: #c0392b; margin-top: 12px; }
+    @media (max-width: 400px) { .header h1 { font-size: 19px; } }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <div class="header-icon">🍽️</div>
+    <div>
+      <h1>Dinner Agent</h1>
+      <p>Chan Family Edition</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <label>Date</label>
+    <input type="date" id="date" />
+  </div>
+
+  <div class="card">
+    <label>Your location</label>
+    <div class="row">
+      <input type="text" id="location" placeholder="e.g. Banqiao, New Taipei" />
+      <button class="btn btn-secondary" onclick="detectGPS()" id="gps-btn">📍 GPS</button>
+    </div>
+  </div>
+
+  <button class="btn btn-full" id="run-btn" onclick="runAgent()">🤖 Run Agent</button>
+
+  <div class="status" id="status">
+    <div class="spinner"></div>
+    <span id="status-text">Starting...</span>
+  </div>
+
+  <div id="error-box" class="error-box" style="display:none;"></div>
+  <div id="results"></div>
+
+</div>
+
+<script>
+  document.getElementById('date').value = new Date().toISOString().split('T')[0];
+  let detectedLat = null, detectedLng = null;
+
+  function detectGPS() {
+    const btn = document.getElementById('gps-btn');
+    btn.textContent = '⏳';
+    btn.disabled = true;
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        detectedLat = pos.coords.latitude;
+        detectedLng = pos.coords.longitude;
+        document.getElementById('location').value = `${detectedLat.toFixed(4)}, ${detectedLng.toFixed(4)}`;
+        btn.textContent = '✅ GPS';
+        btn.disabled = false;
+      },
+      () => { btn.textContent = '📍 GPS'; btn.disabled = false; alert('Could not get GPS. Please type your location.'); }
+    );
+  }
+
+  function setStatus(msg, show=true) {
+    const el = document.getElementById('status');
+    el.style.display = show ? 'flex' : 'none';
+    document.getElementById('status-text').textContent = msg;
+  }
+
+  function showError(msg) {
+    const el = document.getElementById('error-box');
+    el.style.display = 'block';
+    el.textContent = '⚠️ ' + msg;
+  }
+
+  async function runAgent() {
+    const date = document.getElementById('date').value;
+    const location = document.getElementById('location').value.trim();
+    if (!location) { alert('Please enter your location.'); return; }
+
+    document.getElementById('results').innerHTML = '';
+    document.getElementById('error-box').style.display = 'none';
+    const btn = document.getElementById('run-btn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Running...';
+
+    try {
+      setStatus('Checking your calendar for 5–8 pm events...');
+      const res = await fetch('/api/agent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date, location, lat: detectedLat, lng: detectedLng })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Unknown error');
+      setStatus('', false);
+      renderResults(data);
+    } catch (err) {
+      setStatus('', false);
+      showError(err.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '🤖 Run Agent';
+    }
+  }
+
+  function renderResults(data) {
+    const el = document.getElementById('results');
+    if (!data.hasEvents) {
+      el.innerHTML = `<div class="empty"><div class="empty-icon">🏠</div><p>No events found between 5–8 pm.<br>Enjoy a quiet dinner at home!</p></div>`;
+      return;
+    }
+    let html = '';
+    if (data.events?.length) {
+      html += `<div class="section-label">Events tonight</div>`;
+      data.events.forEach(e => {
+        html += `<div class="result-card"><div class="result-icon">📅</div><div>
+          <div class="result-title">${e.title}</div>
+          <div class="result-sub">${e.time}</div>
+          <div class="result-sub">📍 ${e.location}</div>
+          <div class="badges"><span class="badge badge-blue">Find restaurants open until ${e.openUntil}</span></div>
+        </div></div>`;
+      });
+    }
+    if (data.restaurants?.length) {
+      html += `<div class="section-label">Nearby restaurants</div>`;
+      data.restaurants.forEach(r => {
+        html += `<div class="result-card"><div class="result-icon">🍴</div><div style="flex:1">
+          <div class="result-title">${r.name}</div>
+          <div class="result-sub">${r.address}</div>
+          <div class="badges">
+            ${r.rating ? `<span class="badge badge-green">★ ${r.rating}</span>` : ''}
+            ${r.openUntil ? `<span class="badge badge-gray">${r.openUntil}</span>` : ''}
+            ${r.distance ? `<span class="badge badge-gray">${r.distance}</span>` : ''}
+          </div>
+        </div></div>`;
+      });
+    }
+    if (data.carparks?.length) {
+      html += `<div class="section-label">Nearby carparks</div>`;
+      data.carparks.forEach(c => {
+        html += `<div class="result-card"><div class="result-icon">🅿️</div><div>
+          <div class="result-title">${c.name}</div>
+          <div class="result-sub">${c.address}</div>
+          ${c.distance ? `<div class="badges"><span class="badge badge-gray">${c.distance}</span></div>` : ''}
+        </div></div>`;
+      });
+    }
+    if (data.telegramSent) {
+      html += `<div class="tg-banner">✈️ Summary sent to <strong>ChanFamilyDinnerBot</strong> on Telegram</div>`;
+    }
+    el.innerHTML = html;
+  }
+</script>
+</body>
+</html>
