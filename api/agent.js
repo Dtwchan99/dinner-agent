@@ -1,4 +1,4 @@
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -32,8 +32,8 @@ export default async function handler(req, res) {
 
     const rawEvents = calData.items || [];
     const events = rawEvents.map(ev => {
-      const start = ev.start?.dateTime || ev.start?.date;
-      const end = ev.end?.dateTime || ev.end?.date;
+      const start = ev.start && (ev.start.dateTime || ev.start.date);
+      const end = ev.end && (ev.end.dateTime || ev.end.date);
       const startTime = new Date(start);
       const endTime = new Date(end);
       const openUntilTime = new Date(endTime.getTime() + 90 * 60 * 1000);
@@ -67,7 +67,7 @@ export default async function handler(req, res) {
       const R = 6371;
       const dLat = (lat2 - lat1) * Math.PI / 180;
       const dLng = (lng2 - lng1) * Math.PI / 180;
-      const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLng/2)**2;
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng/2) * Math.sin(dLng/2);
       return (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))).toFixed(1);
     };
 
@@ -75,7 +75,7 @@ export default async function handler(req, res) {
       name: r.name,
       address: r.vicinity,
       rating: r.rating || null,
-      openUntil: r.opening_hours?.open_now ? 'Open now' : 'Check hours',
+      openUntil: r.opening_hours && r.opening_hours.open_now ? 'Open now' : 'Check hours',
       distance: `${toKm(searchLat, searchLng, r.geometry.location.lat, r.geometry.location.lng)} km`
     }));
 
@@ -89,17 +89,17 @@ export default async function handler(req, res) {
 
     // Step 3: Send Telegram notification
     if (TG_TOKEN && TG_CHAT_ID) {
-      const lines = [`🍽 *Dinner suggestions for ${date}*\n`];
-      events.forEach(e => lines.push(`📅 *${e.title}* (${e.time})\n📍 ${e.location}\n🕐 Find restaurants open until ${e.openUntil}\n`));
+      const lines = ['🍽 *Dinner suggestions for ' + date + '*\n'];
+      events.forEach(e => lines.push('📅 *' + e.title + '* (' + e.time + ')\n📍 ' + e.location + '\n🕐 Find restaurants open until ' + e.openUntil + '\n'));
       if (restaurants.length) {
         lines.push('🍴 *Nearby restaurants:*');
-        restaurants.forEach(r => lines.push(`• ${r.name}${r.rating ? ' ★'+r.rating : ''} · ${r.distance}\n  ${r.address}`));
+        restaurants.forEach(r => lines.push('• ' + r.name + (r.rating ? ' ★' + r.rating : '') + ' · ' + r.distance + '\n  ' + r.address));
       }
       if (carparks.length) {
         lines.push('\n🅿️ *Nearby carparks:*');
-        carparks.forEach(c => lines.push(`• ${c.name} · ${c.distance}\n  ${c.address}`));
+        carparks.forEach(c => lines.push('• ' + c.name + ' · ' + c.distance + '\n  ' + c.address));
       }
-      await fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
+      await fetch('https://api.telegram.org/bot' + TG_TOKEN + '/sendMessage', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chat_id: TG_CHAT_ID, text: lines.join('\n'), parse_mode: 'Markdown' })
@@ -112,4 +112,4 @@ export default async function handler(req, res) {
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
-}
+};
